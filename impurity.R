@@ -96,16 +96,16 @@ getnewnode <- function(x,y){
 # todo: elaborate
 # build tree: to do: add parameters mentioned in assignment
 ##
-build.tree <- function(x,y){
-  if(tree.impurity(y)>0){
+build.tree <- function(x,y, nmin, minleaf, nfeat){
+  if(tree.impurity(y)>0 && nrow(x) > nmin){
     result1 <- getnewnode(x,y)
-    result <- Node$new(colnames(x)[result1[[2]]], split = result1[[1]], samples = rownames(x))
+    result <- Node$new(colnames(x)[result1[[2]]], split = result1[[1]], samples = rownames(x), featurecolumn = result1[[2]])
     newy1 <- t(y)[result1[[3]]]
     newx1 <- x[result1[[3]],-result1[[2]]]
     newy2 <- t(y)[result1[[4]]]
     newx2 <- (x[result1[[4]],-result1[[1]]])
-    result$AddChildNode(build.tree(newx1, newy1))
-    result$AddChildNode(build.tree(newx2, newy2))
+    result$AddChildNode(build.tree(newx1, newy1, nmin, minleaf, nfeat))
+    result$AddChildNode(build.tree(newx2, newy2, nmin, minleaf, nfeat))
     return(result)
   }
   else{
@@ -114,4 +114,4 @@ build.tree <- function(x,y){
 }
 
 ##Debug code
-print(build.tree(credit.dat[1:5],credit.dat[6]), "split", "samples")
+print(build.tree(credit.dat[1:5],credit.dat[6], 1, 1, 1), "split", "samples", "featurecolumn")
