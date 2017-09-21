@@ -6,9 +6,14 @@ library(data.tree)
 # This function does that by counting the 0 or 1 classes and calculating the frequency and then using the formula.
 ##
 tree.impurity <- function(x){
-  zero_frequency <- length(x[x == 0])/length(x)
-  one_frequency <- length(x[x == 1])/length(x)
-  return(zero_frequency * one_frequency)
+  if(length(x) > 0){
+    zero_frequency <- length(x[x == 0])/length(x)
+    one_frequency <- length(x[x == 1])/length(x)
+    return(zero_frequency * one_frequency)
+  }
+  else{
+    return(0)
+  }
 }
 
 
@@ -48,9 +53,9 @@ calculate.best.split <- function(x,y){
 # todo: define parameters and explain code
 ##
 redistribution <- function(x,y){
-  currentImp <- impurity(y)
-  redis <- currentImp - (length(x[x==0])/length(x))*impurity(y[which(x==0)]) - 
-    (length(x[x==1])/length(x))*impurity(y[which(x==1)])
+  currentImp <- tree.impurity(y)
+  redis <- currentImp - (length(x[x==0])/length(x))*tree.impurity(y[which(x==0)]) - 
+    (length(x[x==1])/length(x))*tree.impurity(y[which(x==1)])
   return(redis)
 }
 
@@ -78,42 +83,35 @@ getsplits <- function(x){
   }
 }
 
+getnewnode <- function(x,y){
+  result <- (apply(x,2,y=y,function(x,y) createCompMatrix(x,t(y))))
+  bestsplitcolumn <- which.max(result[2,])
+  bestsplit <-result[1,bestsplitcolumn]
+  return(list(bestsplit, bestsplitcolumn, c(which(x[bestsplitcolumn] <= bestsplit)), c(which(x[bestsplitcolumn] > bestsplit))))
+}
+
+
 ##
 # Meat of the program.
 # todo: elaborate
+# build tree: to do: add parameters mentioned in assignment
 ##
-build.tree <- function(x,y,result){
-  if(impurity(y)>0){
-    result1 <- (apply(x,2,y=y,function(x,y) createCompMatrix(x,t(y))))
-    print(result1)
-    result<-c(result, (result1[which.max(result1[2,])]))
-    rowschild1 = which(x[which.max(result1[2,])]<=result1[1,which.max(result1[2,])])
-    uselesscolumns = c(which.max(result1[2,]), which(sapply(x, function(x) length(unique(x))<=1)==1))
-    newy1 <- t(y)[rowschild1]
-    newx1 <- (x[rowschild1,-uselesscolumns])
-    print(sapply(newx1, function(x) print(length(unique(x)))))
-    build.tree(newx1, newy1, result)
-    newy2 <- t(y)[-rowschild1]
-    newx2 <- (x[-rowschild1,-uselesscolumns])
-    print(sapply(newx2, function(x) print(length(unique(x)))))
-    build.tree(newx2, newy2,result)
+build.tree <- function(x,y){
+  if(tree.impurity(y)>0){
+    result1 <- getnewnode(x,y)
+    result <- Node$new(colnames(x)[result1[[2]]], split = result1[[1]], samples = rownames(x))
+    newy1 <- t(y)[result1[[3]]]
+    newx1 <- x[result1[[3]],-result1[[2]]]
+    newy2 <- t(y)[result1[[4]]]
+    newx2 <- (x[result1[[4]],-result1[[1]]])
+    result$AddChildNode(build.tree(newx1, newy1))
+    result$AddChildNode(build.tree(newx2, newy2))
+    return(result)
   }
   else{
-    return(result)
+    return(Node$new(paste("Leaf", paste(rownames(x), collapse=",")), split= "Leaf", samples= rownames(x)))
   }
 }
 
 ##Debug code
-print(build.tree(credit.dat[1:5],credit.dat[6], c()))
-
-#Snippets
-
-# <-trainingset[-(which.max(result1[2,])),which(trainingset[which.max(result1[2,])]<=result1[1,which.max(result1[2,])])]
-#rowschild1 = which(trainingset[which.max(result1[2,])]<=result1[1,which.max(result1[2,])])
-#newtrainingset1 <- (trainingset[rowschild1,-which.max(result1[2,])])
-#result1child1 <- apply(newtrainingset1, 2,y=credit.dat[rowschild1,6],function(x,y) createCompMatrix(x,y))
-#print(result1child1)
-#rowschild2 = which(newtrainingset1[which.max(result1child1[2,])]>result1child1[1,which.max(result1child1[2,])])
-#newtrainingset2 <- (trainingset[rowschild2,-which.max(result1[2,])])
-#result1child1child1 <- apply(newtrainingset2, 2,y=credit.dat[rowschild2,6],function(x,y) createCompMatrix(x,y))
-#print(result1child1child1)
+print(build.tree(credit.dat[1:5],credit.dat[6]), "split", "samples")
