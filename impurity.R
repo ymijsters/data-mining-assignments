@@ -6,14 +6,12 @@ library(data.tree)
 # This function does that by counting the 0 or 1 classes and calculating the frequency and then using the formula.
 ##
 tree.impurity <- function(x){
-  if(length(x) > 0){
-    zero_frequency <- length(x[x == 0])/length(x)
-    one_frequency <- length(x[x == 1])/length(x)
-    return(zero_frequency * one_frequency)
-  }
-  else{
+  if(length(x) == 0){
     return(0)
   }
+  zero_frequency <- length(x[x == 0])/length(x)
+  one_frequency <- length(x[x == 1])/length(x)
+  return(zero_frequency * one_frequency)
 }
 
 
@@ -73,43 +71,50 @@ createCompMatrix <- function(x,y){
 # Splits a node depending on the classes. If the node is pure, then return the node. Otherwise split.
 # todo: elaborate
 ##
-getsplits <- function(x){
-  if(length(unique(x))>1){
-    m <- embed(unique(sort(x)),2)
+getsplits <- function(node){
+  if(length(unique(node))>1){
+    m <- embed(unique(sort(node)),2)
     return(rowMeans(m))
   }
   else{
-    return(unique(x))
+    return(unique(node))
   }
 }
 
-getnewnode <- function(x,y){
-  result <- (apply(x,2,y=y,function(x,y) createCompMatrix(x,t(y))))
+getnewnode <- function(data,class){
+  result <- (apply(data,2,y=class,function(x,y) createCompMatrix(x,t(y))))
   bestsplitcolumn <- which.max(result[2,])
   bestsplit <-result[1,bestsplitcolumn]
-  return(list(bestsplit, bestsplitcolumn, c(which(x[bestsplitcolumn] <= bestsplit)), c(which(x[bestsplitcolumn] > bestsplit))))
+  return(list(bestsplit, bestsplitcolumn, c(which(data[bestsplitcolumn] <= bestsplit)), c(which(data[bestsplitcolumn] > bestsplit))))
 }
 
 
 ##
 # Meat of the program.
-# todo: elaborate
-# build tree: to do: add parameters mentioned in assignment
+# todo: implement parameters
+# The parameters are:
+# data: the columns containing the dataset without the class that needs to be split on
+# class: the column containing only the class that needs to be split on
+# nmin: the minimum amount of observations in a node required to split
+# minleaf: the minimum amount of observations allowed in a node
+# nfeat: the amount of features that should be looked at for each split
 ##
-build.tree <- function(x,y, nmin, minleaf, nfeat){
-  if(tree.impurity(y)>0 && nrow(x) > nmin){
-    result1 <- getnewnode(x,y)
-    result <- Node$new(colnames(x)[result1[[2]]], split = result1[[1]], samples = rownames(x), featurecolumn = result1[[2]])
-    newy1 <- t(y)[result1[[3]]]
-    newx1 <- x[result1[[3]],-result1[[2]]]
-    newy2 <- t(y)[result1[[4]]]
-    newx2 <- (x[result1[[4]],-result1[[1]]])
-    result$AddChildNode(build.tree(newx1, newy1, nmin, minleaf, nfeat))
-    result$AddChildNode(build.tree(newx2, newy2, nmin, minleaf, nfeat))
+build.tree <- function(data, class, nmin, minleaf, nfeat){
+  #if there is impurity and there are enough observations for a split, then do so
+  if(tree.impurity(class) > 0 && nrow(data) > nmin){
+    result1 <- getnewnode(data,class)
+    result <- Node$new(colnames(data)[result1[[2]]], split = result1[[1]], samples = rownames(data), featurecolumn = result1[[2]])
+    newclass1 <- t(class)[result1[[3]]]
+    newdata1 <- data[result1[[3]],-result1[[2]]]
+    newclass2 <- t(class)[result1[[4]]]
+    newdata2 <- (data[result1[[4]],-result1[[1]]])
+    #Add child nodes from the split and recursively continue
+    result$AddChildNode(build.tree(newdata1, newclass1, nmin, minleaf, nfeat))
+    result$AddChildNode(build.tree(newdata2, newclass2, nmin, minleaf, nfeat))
     return(result)
   }
   else{
-    return(Node$new(paste("Leaf", paste(rownames(x), collapse=",")), split= "Leaf", samples= rownames(x)))
+    return(Node$new(paste("Leaf", paste(rownames(data), collapse=",")), split= "Leaf", samples= rownames(data)))
   }
 }
 
