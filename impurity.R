@@ -2,6 +2,7 @@ library(data.tree)
 
 ##
 # We use the gini-index as described. This is the R-translation within our structure.
+# x: the vector of values of which the impurity should be determined
 # Given a node x, we determine the impurity with formula i(x) = p(0|x)p(1|x) (two-class Gini-index).
 # This function does that by counting the 0 or 1 classes and calculating the frequency and then using the formula.
 ##
@@ -45,32 +46,44 @@ createCompMatrix <- function(x,y, minleaf){
   return(c(getsplits(x)[which.max(impurity)],max(impurity)))
 }
 ##
-# Splits a node depending on the classes. If the node is pure, then return the node. Otherwise split.
+# Determines all possible splits for a single feature, by averaging every 2 consecutive values
+#
+# !!! Not working for multiclass feature classification and can be more efficient !!!
+#
+# feature: All trainingsamples for a feature. 
+# return: All possible splits for feature or the only value if there are no available splits due to the minleaf constraint
 # todo: elaborate
 ##
-getsplits <- function(node){
-  if(length(unique(node))>1){
-    splitCalculationMatrix <- embed(unique(sort(node)),2)
+getsplits <- function(feature){
+  if(length(unique(feature))>1){
+    splitCalculationMatrix <- embed(unique(sort(feature)),2)
     return(rowMeans(splitCalculationMatrix))
   }
   else{
-    return(unique(node))
+    return(unique(feature))
   }
 }
-
+##
+# Determines a node of the tree by determining the split with the best redistribution
+# data: dataset used for finding the optimal split in the current node
+# class: classifications of trainingsamples present in the current node
+# minleaf: the minimum amount of observations allowed in a node
+# nfeat: the amount of features that should be looked at for each split
+# return: a list with information about: value of the split, feature that is split, new dataset left and new dataset right
+##
 getnewnode <- function(data,class, minleaf, nfeat){
-  print(c(1:ncol(data)))
   selectedColumns <- sample(c(1:ncol(data)), min(nfeat,ncol(data)))
-  datawithnfeat <- data[, selectedColumns]
-  print(datawithnfeat)
-  result <- (apply(data,2,y=class, minleaf = minleaf, function(x,y, minleaf) createCompMatrix(x,t(y), minleaf)))
+  datawithnfeat <- data[selectedColumns]
+  result <- (apply(datawithnfeat,2,y=class, minleaf = minleaf, function(x,y, minleaf) createCompMatrix(x,t(y), minleaf)))
+  print(result)
+  print(data)
   bestsplitcolumn <- which.max(result[2,])
   bestsplit <-result[1,bestsplitcolumn]
   if(bestsplit == 0){
     return(list(0))
   }
   else{
-    return(list(bestsplit, bestsplitcolumn, c(which(data[bestsplitcolumn] <= bestsplit)), c(which(data[bestsplitcolumn] > bestsplit))))
+    return(list(bestsplit, selectedColumns[bestsplitcolumn], c(which(data[selectedColumns[bestsplitcolumn]] <= bestsplit)), c(which(data[selectedColumns[bestsplitcolumn]] > bestsplit))))
   }
 }
 
@@ -87,21 +100,23 @@ getnewnode <- function(data,class, minleaf, nfeat){
 ##
 build.tree <- function(data, class, nmin, minleaf, nfeat){
   #if there is impurity and there are enough observations for a split, then do so
-  if(tree.impurity(class) > 0 && nrow(data) > nmin){
+  print(data)
+  if(tree.impurity(class) > 0 && nrow(data) > nmin && ncol(data) > 0){
     result1 <- getnewnode(data,class, minleaf, nfeat)
+    #There can still be no split because of the nfeat and minleaf limitations
     if(result1[[1]] != 0){
       result <- Node$new(colnames(data)[result1[[2]]], split = result1[[1]], samples = rownames(data), featurecolumn = result1[[2]])
-      newclass1 <- t(class)[result1[[3]]]
-      newdata1 <- data[result1[[3]],-result1[[2]]]
-      newclass2 <- t(class)[result1[[4]]]
-      newdata2 <- (data[result1[[4]],-result1[[1]]])
+      newclass1 <- class[result1[[3]]]
+      newdata1 <- data[result1[[3]],-result1[[2]], drop = FALSE]
+      newclass2 <- class[result1[[4]]]
+      newdata2 <- (data[result1[[4]],-result1[[2]], drop = FALSE])
       #Add child nodes from the split and recursively continue
       result$AddChildNode(build.tree(newdata1, newclass1, nmin, minleaf, nfeat))
       result$AddChildNode(build.tree(newdata2, newclass2, nmin, minleaf, nfeat))
       return(result)
     }
   }
-  return(Node$new(paste("Leaf", paste(rownames(data), collapse=",")), split= "Leaf", samples= rownames(data)))
+  return(Node$new(paste("Leaf", paste(rownames(data), collapse=",")), split= "Leaf", samples= rownames(data), class=class))
 }
 ##
 # Classify a trainingssample on a decision tree
@@ -111,5 +126,10 @@ tree.classify <- function(x, tree){
 }
 
 
-##Debug code
-print(build.tree(credit.dat[1:5],credit.dat[6], 1, 0, 5), "split", "samples", "featurecolumn")
+##Debug code --> nfeat and nmin work, minleaf not always
+for(i in 1:1000){
+  nfeat <- sample(1:5,1)
+  minleaf <- sample(1:5,1)
+  nmin <- sample(1:5,1)
+  print(build.tree(credit.dat[1:5],t(credit.dat[6]), nmin, minleaf, nfeat), "split", "samples", "featurecolumn", "class")
+}
