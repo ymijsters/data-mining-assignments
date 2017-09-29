@@ -10,9 +10,8 @@ tree.impurity <- function(x){
   if(length(x) == 0){
     return(0)
   }
-  zero_frequency <- length(x[x == 0])/length(x)
-  one_frequency <- length(x[x == 1])/length(x)
-  return(zero_frequency * one_frequency)
+  uniquex = unique(as.vector(x))
+  return(sum(unlist(lapply(uniquex, classes = x, function(x, classes) (length(classes[which(classes==x)])/length(classes))*(length(classes[which(classes!=x)])/length(classes))))))
 }
 
 ##
@@ -35,7 +34,8 @@ redistribution <- function(x,y){
 # todo: elaborate
 ##
 createCompMatrix <- function(x,y, minleaf){
-  compmatrixx1 <- expand.grid(x,getsplits(x))
+  possiblesplits <- getsplits(x, y, minleaf)
+  compmatrixx1 <- expand.grid(x, possiblesplits)
   splitmatrix <- matrix(as.numeric(compmatrixx1[,1] <= compmatrixx1[,2]), nrow=length(x))
   allowedSplitsWithMinLeaf = (which(colSums(splitmatrix) >= minleaf & colSums(splitmatrix) <= length(x) - minleaf))
   if(length(allowedSplitsWithMinLeaf) == 0 ){
@@ -43,21 +43,26 @@ createCompMatrix <- function(x,y, minleaf){
   }
   splitmatrix <- matrix(splitmatrix[, allowedSplitsWithMinLeaf], ncol = length(allowedSplitsWithMinLeaf))
   impurity <- apply(splitmatrix,2, y=y, function(splitmatrix,y) redistribution(splitmatrix,y))
-  return(c(getsplits(x)[which.max(impurity)],max(impurity)))
+  return(c(possiblesplits[allowedSplitsWithMinLeaf[which.max(impurity)]],max(impurity)))
 }
 ##
 # Determines all possible splits for a single feature, by averaging every 2 consecutive values
-#
-# !!! Not working for multiclass feature classification and can be more efficient !!!
-#
+# If minleaf = 0, this can be done more efficient by determining segments and only considering segment splits
 # feature: All trainingsamples for a feature. 
 # return: All possible splits for feature or the only value if there are no available splits due to the minleaf constraint
 # todo: elaborate
 ##
-getsplits <- function(feature){
+getsplits <- function(feature, classes, minleaf){
   if(length(unique(feature))>1){
-    splitCalculationMatrix <- embed(unique(sort(feature)),2)
-    return(rowMeans(splitCalculationMatrix))
+    if(minleaf > 0 || unique(feature) < 3){
+      splitCalculationMatrix <- embed(unique(sort(feature)),2)
+      return(rowMeans(splitCalculationMatrix))
+    }
+    else{
+      uniques = sort(unique(feature))
+      segmentmatrix <- (sapply(uniques, class = classes, feature=feature, function(x, feature, class) c(x,mean(class[which(feature==x)]))))
+      return(rowMeans(matrix(c(uniques[which(embed(segmentmatrix[2,],2)[,1]!=embed(segmentmatrix[2,],2)[,2])],uniques[which(embed(segmentmatrix[2,],2)[,1]!=embed(segmentmatrix[2,],2)[,2])+1]), ncol=2)))
+    }
   }
   else{
     return(unique(feature))
@@ -75,8 +80,6 @@ getnewnode <- function(data,class, minleaf, nfeat){
   selectedColumns <- sample(c(1:ncol(data)), min(nfeat,ncol(data)))
   datawithnfeat <- data[selectedColumns]
   result <- (apply(datawithnfeat,2,y=class, minleaf = minleaf, function(x,y, minleaf) createCompMatrix(x,t(y), minleaf)))
-  print(result)
-  print(data)
   bestsplitcolumn <- which.max(result[2,])
   bestsplit <-result[1,bestsplitcolumn]
   if(bestsplit == 0){
@@ -100,8 +103,7 @@ getnewnode <- function(data,class, minleaf, nfeat){
 ##
 build.tree <- function(data, class, nmin, minleaf, nfeat){
   #if there is impurity and there are enough observations for a split, then do so
-  print(data)
-  if(tree.impurity(class) > 0 && nrow(data) > nmin && ncol(data) > 0){
+  if(tree.impurity(class) > 0 && nrow(data) > nmin && ncol(data) > 0 && nrow(data)/2 >= minleaf){
     result1 <- getnewnode(data,class, minleaf, nfeat)
     #There can still be no split because of the nfeat and minleaf limitations
     if(result1[[1]] != 0){
@@ -116,20 +118,43 @@ build.tree <- function(data, class, nmin, minleaf, nfeat){
       return(result)
     }
   }
-  return(Node$new(paste("Leaf", paste(rownames(data), collapse=",")), split= "Leaf", samples= rownames(data), class=class))
+  return(Node$new(paste("Leaf", paste(rownames(data), collapse=",")), split= "Leaf", samples= paste(rownames(data), collapse=","), class=paste(class, collapse=",")))
 }
+##
+# y : classes of samples in a leaf node
+# return: Most likely class of sample in leaf node
+##
+averageclasses <- function(y){
+  y = unlist(lapply(strsplit(y,","), as.integer))
+  classes= unique((y))
+  return(max(sum((y[y=classes]))))
+}
+
+
 ##
 # Classify a trainingssample on a decision tree
 ##
 tree.classify <- function(x, tree){
-  
+  if(tree$split == 'Leaf'){
+    return(averageclasses(tree$class))
+  }
+  else if(x[tree$featurecolumn] <= tree$split){
+    return(tree.classify(x, tree$children[[1]]))
+  }
+  else{
+    return(tree.classify(x, tree$children[[2]]))
+  }
 }
+tree <- build.tree(credit.dat[1:5], t(credit.dat[6]), 0, 0, 5)
+print(tree, 'split' ,'samples', 'class')
+print(tree.classify(credit.dat[8,], tree))
 
 
 ##Debug code --> nfeat and nmin work, minleaf not always
-for(i in 1:1000){
+for(i in 1:1){
   nfeat <- sample(1:5,1)
   minleaf <- sample(1:5,1)
   nmin <- sample(1:5,1)
+  print(c(nmin,minleaf,nfeat))
   print(build.tree(credit.dat[1:5],t(credit.dat[6]), nmin, minleaf, nfeat), "split", "samples", "featurecolumn", "class")
 }
