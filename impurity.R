@@ -109,16 +109,20 @@ build.tree <- function(data, class, nmin, minleaf, nfeat){
     if(result1[[1]] != 0){
       result <- Node$new(colnames(data)[result1[[2]]], split = result1[[1]], samples = rownames(data), featurecolumn = result1[[2]])
       newclass1 <- class[result1[[3]]]
-      newdata1 <- data[result1[[3]],-result1[[2]], drop = FALSE]
+      newdata1 <- data[result1[[3]], -result1[[2]], drop = FALSE]
       newclass2 <- class[result1[[4]]]
-      newdata2 <- (data[result1[[4]],-result1[[2]], drop = FALSE])
+      newdata2 <- data[result1[[4]], -result1[[2]], drop = FALSE]
       #Add child nodes from the split and recursively continue
-      result$AddChildNode(build.tree(newdata1, newclass1, nmin, minleaf, nfeat))
-      result$AddChildNode(build.tree(newdata2, newclass2, nmin, minleaf, nfeat))
+      child1 <- build.tree(newdata1, newclass1, nmin, minleaf, nfeat)
+      child2 <- build.tree(newdata2, newclass2, nmin, minleaf, nfeat)
+      child1$name <- paste(child1$name, " ", child1$split, " 1")
+      child2$name <- paste(child2$name, " ", child2$split, " 2")
+      result$AddChildNode(child1)
+      result$AddChildNode(child2)
       return(result)
     }
   }
-  return(Node$new(paste("Leaf", paste(rownames(data), collapse=",")), split= "Leaf", samples= paste(rownames(data), collapse=","), class=paste(class, collapse=",")))
+  return(Node$new(paste("Leaf", paste(c(sum(class==0),sum(class==1)), collapse=",")), split= "Leaf", samples= paste(rownames(data), collapse=","), class=paste(class, collapse=",")))
 }
 ##
 # y : classes of samples in a leaf node
@@ -127,34 +131,50 @@ build.tree <- function(data, class, nmin, minleaf, nfeat){
 averageclasses <- function(y){
   y = unlist(lapply(strsplit(y,","), as.integer))
   classes= unique((y))
-  return(max(sum((y[y=classes]))))
+  return(classes[which.max(tabulate(match(y,classes)))])
 }
 
+tree.getclassification <- function(x, tree){
+  if(tree$split == 'Leaf'){
+    return(averageclasses(tree$class))
+  }
+  else if(x[tree$featurecolumn] <= tree$split){
+    return(tree.getclassification(x, tree$children[[1]]))
+  }
+  else{
+    return(tree.getclassification(x, tree$children[[2]]))
+  }
+}
 
 ##
 # Classify a trainingssample on a decision tree
 ##
 tree.classify <- function(x, tree){
-  if(tree$split == 'Leaf'){
-    return(averageclasses(tree$class))
-  }
-  else if(x[tree$featurecolumn] <= tree$split){
-    return(tree.classify(x, tree$children[[1]]))
-  }
-  else{
-    return(tree.classify(x, tree$children[[2]]))
-  }
+  return(apply(x,1,tree=tree, function(x, tree) tree.getclassification(x,tree)))
 }
-tree <- build.tree(credit.dat[1:5], t(credit.dat[6]), 0, 0, 5)
-print(tree, 'split' ,'samples', 'class')
-print(tree.classify(credit.dat[8,], tree))
-
-
-##Debug code --> nfeat and nmin work, minleaf not always
-for(i in 1:1){
-  nfeat <- sample(1:5,1)
-  minleaf <- sample(1:5,1)
-  nmin <- sample(1:5,1)
-  print(c(nmin,minleaf,nfeat))
-  print(build.tree(credit.dat[1:5],t(credit.dat[6]), nmin, minleaf, nfeat), "split", "samples", "featurecolumn", "class")
+##
+# Get the precision: The percentage correctly classified positives of the total positives of the classificationset 
+##
+getPrecision <- function(ymodel, ydata){
+  print(length(which(ymodel==1 & ydata==1))/length(which(ymodel==1)))
 }
+##
+# Get the accuracy: The percentage correctly classified positives of the total positives of the testset
+##
+getRecall <- function(ymodel, ydata){
+  print(length(which(ymodel==1 & ydata==1))/length(which(ydata==1)))
+}
+##
+# Get the accuracy: The percentage correctly classified samples of samples in the dataset
+##
+getAccuracy <- function(ymodel, ydata){
+  print((length(which(ymodel==1 & ydata==1))+length(which(ymodel==0 & ydata==0)))/length(ymodel))
+}
+##
+# Excercise 2a
+##
+secondtree <- build.tree(trainingset[c(3, 5:44)], as.numeric(dataset[4] > 0), 15, 5, 41)
+classifications <- tree.classify(testset[c(3,5:45)], secondtree)
+getPrecision(classifications, as.numeric(testset[4] > 0))
+getRecall(classifications, as.numeric(testset[4] > 0))
+getAccuracy(classifications, as.numeric(testset[4] > 0))
