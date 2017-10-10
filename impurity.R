@@ -66,7 +66,14 @@ tree.classify <- function(x, tree){
 tree.classify.bag <- function(x, treeList){
 	#We map each tree to a classification
 	classifications <- map(treeList, (function(tree) tree.classify(x, tree)))
-  	
+  	#We take the sum of all classifications per column
+	classSums <- rowSums(as.matrix(sapply(classifications, as.numeric)))
+	print(classSums)
+	#If the value > length(treeList)/2, we map 1, otherwise 0. 
+	#We get either 0 or 1, maximum is length(x), minimum 0. If we get less than half, we conclude more 0s than 1s
+	#and vice versa
+	pivot <- length(treeList)/2
+	return(as.numeric(map(classSums, (function(sum) if(sum >= pivot) 1 else 0))))
 }
 
 
@@ -249,4 +256,6 @@ getRecall(classifications, as.numeric(testset[4] > 0))
 getAccuracy(classifications, as.numeric(testset[4] > 0))
 randTreeList <- tree.grow.bag(trainingset[c(3,5:44)], as.numeric(dataset[4] > 0), 15, 5, 41, 5)
 randTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randTreeList)
-print(randTreeListClassifications)
+getPrecision(randTreeListClassifications, as.numeric(testset[4] > 0))
+getRecall(randTreeListClassifications, as.numeric(testset[4] > 0))
+getAccuracy(randTreeListClassifications, as.numeric(testset[4] > 0))
