@@ -1,11 +1,11 @@
 library(data.tree)
-
+library("purrr")
 ##
 # Description
 # 	Meat of the program recursive tree builder.
 # Parameters
-#	data: the columns containing the dataset without the class that needs to be split on --> Should be called x
-# 	class: the column containing only the class that needs to be split on --> Should be called y
+#	data: the columns containing the dataset without the class that needs to be split on
+# 	class: the column containing only the class that needs to be split on
 # 	nmin: the minimum amount of observations in a node required to split
 # 	minleaf: the minimum amount of observations allowed in a node
 # 	nfeat: the amount of features that should be looked at for each split
@@ -13,7 +13,7 @@ library(data.tree)
 #	?
 ##
 tree.grow <- function(x, y, nmin, minleaf, nfeat){
-  #if there is impurity and there are enough observations for a split, then do so
+  #if there is impurity and there are enough observations for a split (according to nmin), then perform a split
   if(tree.impurity(y) > 0 && nrow(x) > nmin && ncol(x) > 0 && nrow(x)/2 >= minleaf){
     result1 <- tree.getNewNode(x,y, minleaf, nfeat)
     #There can still be no split because of the nfeat and minleaf limitations
@@ -36,6 +36,20 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
   return(Node$new(paste("Leaf", paste(c(sum(y==0),sum(y==1)), collapse=",")), split= "Leaf", samples= paste(rownames(x), collapse=","), class=paste(y, collapse=",")))
 }
 
+tree.grow.createSampleTree <- function(x, y, nmin, minleaf, nfeat, seed){
+	set.seed(seed)
+        sampleIndexes <- sample(seq_len(nrow(x)), size = 0.5 * nrow(x))
+	sampleX <- x[sampleIndexes,]
+	sampleY <- y[sampleIndexes]
+	return(tree.grow(sampleX, sampleY, nmin, minleaf, nfeat))
+}
+
+tree.grow.bag <- function(x, y, nmin, minleaf, nfeat, m){
+	#We take an array from 1:m and map each value to a tree, using the original value as a seed
+        return(map(1:m, (function(i) tree.grow.createSampleTree(x, y, nmin, minleaf, nfeat, i) )))
+}
+
+
 ##
 # Description
 # 	Classify a trainingssample on a decision tree. We get each row from the matrix and then transform that to a classifcation of the row.
@@ -47,6 +61,12 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
 ##
 tree.classify <- function(x, tree){
   return(apply(x,1,tree=tree, function(x, tree) tree.getClassification(x,tree)))
+}
+
+tree.classify.bag <- function(x, treeList){
+	#We map each tree to a classification
+	classifications <- map(treeList, (function(tree) tree.classify(x, tree)))
+  	
 }
 
 
@@ -227,3 +247,6 @@ classifications <- tree.classify(testset[c(3,5:45)], secondtree)
 getPrecision(classifications, as.numeric(testset[4] > 0))
 getRecall(classifications, as.numeric(testset[4] > 0))
 getAccuracy(classifications, as.numeric(testset[4] > 0))
+randTreeList <- tree.grow.bag(trainingset[c(3,5:44)], as.numeric(dataset[4] > 0), 15, 5, 41, 5)
+randTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randTreeList)
+print(randTreeListClassifications)
