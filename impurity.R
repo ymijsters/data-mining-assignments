@@ -36,7 +36,7 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
   return(Node$new(paste("Leaf", paste(c(sum(y==0),sum(y==1)), collapse=",")), split= "Leaf", samples= paste(rownames(x), collapse=","), class=paste(y, collapse=",")))
 }
 
-tree.grow.createSampleTree <- function(x, y, nmin, minleaf, nfeat, seed){
+tree.grow.bag.createSampleTree <- function(x, y, nmin, minleaf, nfeat, seed){
 	set.seed(seed)
         sampleIndexes <- sample(seq_len(nrow(x)), size = 0.5 * nrow(x))
 	sampleX <- x[sampleIndexes,]
@@ -46,7 +46,7 @@ tree.grow.createSampleTree <- function(x, y, nmin, minleaf, nfeat, seed){
 
 tree.grow.bag <- function(x, y, nmin, minleaf, nfeat, m){
 	#We take an array from 1:m and map each value to a tree, using the original value as a seed
-        return(map(1:m, (function(i) tree.grow.createSampleTree(x, y, nmin, minleaf, nfeat, i) )))
+        return(map(1:m, (function(i) tree.grow.bag.createSampleTree(x, y, nmin, minleaf, nfeat, i) )))
 }
 
 
@@ -68,7 +68,6 @@ tree.classify.bag <- function(x, treeList){
 	classifications <- map(treeList, (function(tree) tree.classify(x, tree)))
   	#We take the sum of all classifications per column
 	classSums <- rowSums(as.matrix(sapply(classifications, as.numeric)))
-	print(classSums)
 	#If the value > length(treeList)/2, we map 1, otherwise 0. 
 	#We get either 0 or 1, maximum is length(x), minimum 0. If we get less than half, we conclude more 0s than 1s
 	#and vice versa
@@ -230,32 +229,40 @@ tree.getClassification <- function(x, tree){
 # Get the precision: The percentage correctly classified positives of the total positives of the classificationset 
 ##
 getPrecision <- function(ymodel, ydata){
-  print(length(which(ymodel==1 & ydata==1))/length(which(ymodel==1)))
+  return(length(which(ymodel==1 & ydata==1))/length(which(ymodel==1)))
 }
 ##
-# Get the accuracy: The percentage correctly classified positives of the total positives of the testset
+# Get the recall: The percentage correctly classified positives of the total positives of the testset
 ##
 getRecall <- function(ymodel, ydata){
-  print(length(which(ymodel==1 & ydata==1))/length(which(ydata==1)))
+  return(length(which(ymodel==1 & ydata==1))/length(which(ydata==1)))
 }
 ##
 # Get the accuracy: The percentage correctly classified samples of samples in the dataset
 ##
 getAccuracy <- function(ymodel, ydata){
-  print((length(which(ymodel==1 & ydata==1))+length(which(ymodel==0 & ydata==0)))/length(ymodel))
+  return((length(which(ymodel==1 & ydata==1))+length(which(ymodel==0 & ydata==0)))/length(ymodel))
 }
 
+printStats <- function(name,ymodel, ydata){
+	print(name)
+	print(getPrecision(ymodel,ydata))
+	print(getRecall(ymodel,ydata))
+	print(getAccuracy(ymodel,ydata))
+}
 
 dataset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
 trainingset <- read.csv("eclipse-metrics-packages-2.1.csv", sep=";")
 testset <- read.csv("eclipse-metrics-packages-3.0.csv", sep=";")
-secondtree <- tree.grow(trainingset[c(3, 5:44)], as.numeric(dataset[4] > 0), 15, 5, 41)
-classifications <- tree.classify(testset[c(3,5:45)], secondtree)
-getPrecision(classifications, as.numeric(testset[4] > 0))
-getRecall(classifications, as.numeric(testset[4] > 0))
-getAccuracy(classifications, as.numeric(testset[4] > 0))
-randTreeList <- tree.grow.bag(trainingset[c(3,5:44)], as.numeric(dataset[4] > 0), 15, 5, 41, 5)
-randTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randTreeList)
-getPrecision(randTreeListClassifications, as.numeric(testset[4] > 0))
-getRecall(randTreeListClassifications, as.numeric(testset[4] > 0))
-getAccuracy(randTreeListClassifications, as.numeric(testset[4] > 0))
+
+tree <- tree.grow(trainingset[c(3, 5:44)], as.numeric(dataset[4] > 0), 15, 5, 41)
+classifications <- tree.classify(testset[c(3,5:45)], tree)
+printStats("Regular", classifications, as.numeric(dataset[4] > 0))
+
+bagTreeList <- tree.grow.bag(trainingset[c(3,5:44)], as.numeric(dataset[4] > 0), 15, 5, 41, 100)
+bagTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randTreeList)
+printStats("Bagged", bagTreeListClassifications, as.numeric(dataset[4] > 0))
+
+randomForestTreeList <- tree.grow.bag(trainingset[c(3,5:44)], as.numeric(dataset[4] > 0), 15, 5, 6, 100)
+randomForestTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randTreeList)
+printStats("Random Forest", randomForestTreeListClassifications, as.numeric(dataset[4] > 0))
