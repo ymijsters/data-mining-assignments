@@ -219,15 +219,6 @@ tree.getClassification <- function(x, tree){
   }
 }
 
-#tree.grow(credit.dat[1:5], t(credit.dat[6]), 1, 1, 5)
-
-tree <- tree.grow(diabetesdataset[1:8],t(diabetesdataset[9]),20,5,8)
-classifications <- tree.classify(diabetesdataset[1:8],tree)
-print(length(which(classifications==0 & diabetesdataset[9]==0)))
-print(length(which(classifications==0 & diabetesdataset[9]==1)))
-print(length(which(classifications==1 & diabetesdataset[9]==0)))
-print(length(which(classifications==1 & diabetesdataset[9]==1)))
-
 
 ##
 # Exercise 2a
@@ -253,29 +244,42 @@ getAccuracy <- function(ymodel, ydata){
 }
 
 getConfusionMatrix <- function(ymodel, ydata){
-
+        corPos <- length(which(ymodel==1 & ydata==1))
+        falsePos <- length(which(ymodel==1 & ydata==0))
+        corNeg <- length(which(ymodel==0 & ydata==0))
+        falseNeg <- length(which(ymodel==0 & ydata==1))
+        return(matrix(c(corNeg,falsePos,falseNeg,corPos), nrow=2, ncol=2))
 }
 
 printStats <- function(name,ymodel, ydata){
-	print(name)
-	print(getConfusionMatrix(ymodel, ydata))
-	print(getPrecision(ymodel,ydata))
-	print(getRecall(ymodel,ydata))
-	print(getAccuracy(ymodel,ydata))
+	print(paste("-",name,"-",sep="--------"))
+        print("Confusion Matrix")
+        print(getConfusionMatrix(ymodel, ydata))
+	print("Precision")
+        print(getPrecision(ymodel,ydata))
+	print("Recall")
+        print(getRecall(ymodel,ydata))
+	print("Accuracy")
+        print(getAccuracy(ymodel,ydata))
 }
 
-#dataset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
-#trainingset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
-#testset <- read.csv("eclipse-metrics-packages-3.0.csv", sep=";")
+dataset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
+trainingset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
+testset <- read.csv("eclipse-metrics-packages-3.0.csv", sep=";")
+diabetesdataset <- read.csv("pima-indians-diabetes.data.txt", sep=",")
 
-#tree <- tree.grow(trainingset[c(3, 5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 41)
-#classifications <- tree.classify(testset[c(3,5:45)], tree)
-#printStats("Regular", classifications, as.numeric(testset[4] > 0))
+diabetesTree <- tree.grow(diabetesdataset[1:8],t(diabetesdataset[9]),20,5,8)
+diabetesClassifications <- tree.classify(diabetesdataset[1:8],diabetesTree)
+printStats("Diabetes", diabetesClassifications, t(diabetesdataset[9])) 
 
-#bagTreeList <- tree.grow.bag(trainingset[c(3,5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 41, 100)
-#bagTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], bagTreeList)
-#printStats("Bagged", bagTreeListClassifications, as.numeric(testset[4] > 0))
+tree <- tree.grow(trainingset[c(3, 5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 41)
+classifications <- tree.classify(testset[c(3,5:45)], tree)
+printStats("Regular", classifications, as.numeric(testset[4] > 0))
 
-#randomForestTreeList <- tree.grow.bag(trainingset[c(3,5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 6, 100)
-#randomForestTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randomForestTreeList)
-#printStats("Random Forest", randomForestTreeListClassifications, as.numeric(testset[4] > 0))
+bagTreeList <- tree.grow.bag(trainingset[c(3,5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 41, 100)
+bagTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], bagTreeList)
+printStats("Bagged", bagTreeListClassifications, as.numeric(testset[4] > 0))
+
+randomForestTreeList <- tree.grow.bag(trainingset[c(3,5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 6, 100)
+randomForestTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randomForestTreeList)
+printStats("Random Forest", randomForestTreeListClassifications, as.numeric(testset[4] > 0))
