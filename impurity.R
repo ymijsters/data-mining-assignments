@@ -244,8 +244,13 @@ getAccuracy <- function(ymodel, ydata){
   return((length(which(ymodel==1 & ydata==1))+length(which(ymodel==0 & ydata==0)))/length(ymodel))
 }
 
+getConfusionMatrix <- function(ymodel, ydata){
+
+}
+
 printStats <- function(name,ymodel, ydata){
 	print(name)
+	print(getConfusionMatrix(ymodel, ydata))
 	print(getPrecision(ymodel,ydata))
 	print(getRecall(ymodel,ydata))
 	print(getAccuracy(ymodel,ydata))
