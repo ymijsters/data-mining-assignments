@@ -20,9 +20,9 @@ tree.grow <- function(x, y, nmin, minleaf, nfeat){
     if(result1[[1]] != 0){
       result <- Node$new(colnames(x)[result1[[2]]], split = result1[[1]], samples = rownames(x), featurecolumn = result1[[2]])
       newy1 <- y[result1[[3]]]
-      newx1 <- x[result1[[3]], -result1[[2]], drop = FALSE]
+      newx1 <- x[result1[[3]], , drop = FALSE]
       newy2 <- y[result1[[4]]]
-      newx2 <- x[result1[[4]], -result1[[2]], drop = FALSE]
+      newx2 <- x[result1[[4]], , drop = FALSE]
       #Add child nodes from the split and recursively continue
       child1 <- tree.grow(newx1, newy1, nmin, minleaf, nfeat)
       child2 <- tree.grow(newx2, newy2, nmin, minleaf, nfeat)
@@ -65,7 +65,7 @@ tree.classify <- function(x, tree){
 
 tree.classify.bag <- function(x, treeList){
 	#We map each tree to a classification
-	classifications <- map(treeList, (function(tree) tree.classify(x, tree)))
+	classifications <- map(treeList, x=x, (function(tree,x) tree.classify(x, tree)))
   	#We take the sum of all classifications per column
 	classSums <- rowSums(as.matrix(sapply(classifications, as.numeric)))
 	#If the value > length(treeList)/2, we map 1, otherwise 0. 
@@ -91,7 +91,7 @@ tree.impurity <- function(x){
     return(0)
   }
   uniquex = unique(as.vector(x))
-  return(sum(unlist(lapply(uniquex, classes = x, function(x, classes) (length(classes[which(classes==x)])/length(classes))*(length(classes[which(classes!=x)])/length(classes))))))
+  return(sum(unlist(lapply(uniquex, classes = x, function(x, classes) (length(which(classes==x))/length(classes))*(length(which(classes!=x))/length(classes))))))
 }
 
 ##
@@ -219,6 +219,14 @@ tree.getClassification <- function(x, tree){
   }
 }
 
+#tree.grow(credit.dat[1:5], t(credit.dat[6]), 1, 1, 5)
+
+tree <- tree.grow(diabetesdataset[1:8],t(diabetesdataset[9]),20,5,8)
+classifications <- tree.classify(diabetesdataset[1:8],tree)
+print(length(which(classifications==0 & diabetesdataset[9]==0)))
+print(length(which(classifications==0 & diabetesdataset[9]==1)))
+print(length(which(classifications==1 & diabetesdataset[9]==0)))
+print(length(which(classifications==1 & diabetesdataset[9]==1)))
 
 
 ##
@@ -256,18 +264,18 @@ printStats <- function(name,ymodel, ydata){
 	print(getAccuracy(ymodel,ydata))
 }
 
-dataset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
-trainingset <- read.csv("eclipse-metrics-packages-2.1.csv", sep=";")
-testset <- read.csv("eclipse-metrics-packages-3.0.csv", sep=";")
+#dataset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
+#trainingset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
+#testset <- read.csv("eclipse-metrics-packages-3.0.csv", sep=";")
 
-tree <- tree.grow(trainingset[c(3, 5:44)], as.numeric(dataset[4] > 0), 15, 5, 41)
-classifications <- tree.classify(testset[c(3,5:45)], tree)
-printStats("Regular", classifications, as.numeric(dataset[4] > 0))
+#tree <- tree.grow(trainingset[c(3, 5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 41)
+#classifications <- tree.classify(testset[c(3,5:45)], tree)
+#printStats("Regular", classifications, as.numeric(testset[4] > 0))
 
-bagTreeList <- tree.grow.bag(trainingset[c(3,5:44)], as.numeric(dataset[4] > 0), 15, 5, 41, 100)
-bagTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randTreeList)
-printStats("Bagged", bagTreeListClassifications, as.numeric(dataset[4] > 0))
+#bagTreeList <- tree.grow.bag(trainingset[c(3,5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 41, 100)
+#bagTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], bagTreeList)
+#printStats("Bagged", bagTreeListClassifications, as.numeric(testset[4] > 0))
 
-randomForestTreeList <- tree.grow.bag(trainingset[c(3,5:44)], as.numeric(dataset[4] > 0), 15, 5, 6, 100)
-randomForestTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randTreeList)
-printStats("Random Forest", randomForestTreeListClassifications, as.numeric(dataset[4] > 0))
+#randomForestTreeList <- tree.grow.bag(trainingset[c(3,5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 6, 100)
+#randomForestTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randomForestTreeList)
+#printStats("Random Forest", randomForestTreeListClassifications, as.numeric(testset[4] > 0))
