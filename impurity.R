@@ -263,23 +263,42 @@ printStats <- function(name,ymodel, ydata){
         print(getAccuracy(ymodel,ydata))
 }
 
+getPValue <- function(yData, ymodelA, ymodelB){
+	matrixA <- getConfusionMatrix(ymodelA, yData)
+	matrixB <- getConfusionMatrix(ymodelB, yData)
+	nA <- matrixA[1,2] +  matrixA[2,1]
+	nB <- matrixB[1,2] +  matrixB[2,1]
+	return(2*pbinom(nA, size=nA+nB, prob=0.5))
+}
+
 dataset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
 trainingset <- read.csv("eclipse-metrics-packages-2.0.csv", sep=";")
 testset <- read.csv("eclipse-metrics-packages-3.0.csv", sep=";")
 diabetesdataset <- read.csv("pima-indians-diabetes.data.txt", sep=",")
 
-diabetesTree <- tree.grow(diabetesdataset[1:8],t(diabetesdataset[9]),20,5,8)
-diabetesClassifications <- tree.classify(diabetesdataset[1:8],diabetesTree)
-printStats("Diabetes", diabetesClassifications, t(diabetesdataset[9])) 
+#diabetesTree <- tree.grow(diabetesdataset[1:8],t(diabetesdataset[9]),20,5,8)
+#diabetesClassifications <- tree.classify(diabetesdataset[1:8],diabetesTree)
+#printStats("Diabetes", diabetesClassifications, t(diabetesdataset[9])) 
 
-tree <- tree.grow(trainingset[c(3, 5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 41)
-classifications <- tree.classify(testset[c(3,5:45)], tree)
+regTree <- tree.grow(trainingset[c(3, 5:45)], t(as.numeric(dataset[4] > 0)), 15, 5, 41)
+classifications <- tree.classify(testset[c(3,5:45)], regTree)
 printStats("Regular", classifications, as.numeric(testset[4] > 0))
 
-bagTreeList <- tree.grow.bag(trainingset[c(3,5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 41, 100)
+print("P value regular vs regular (sanity check)")
+print(getPValue(as.numeric(dataset[4] > 0),classifications, classifications));
+
+bagTreeList <- tree.grow.bag(trainingset[c(3,5:45)], t(as.numeric(dataset[4] > 0)), 15, 5, 41, 100)
 bagTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], bagTreeList)
 printStats("Bagged", bagTreeListClassifications, as.numeric(testset[4] > 0))
 
-randomForestTreeList <- tree.grow.bag(trainingset[c(3,5:44)], t(as.numeric(dataset[4] > 0)), 15, 5, 6, 100)
+randomForestTreeList <- tree.grow.bag(trainingset[c(3,5:45)], t(as.numeric(dataset[4] > 0)), 15, 5, 6, 100)
 randomForestTreeListClassifications <- tree.classify.bag(testset[c(3,5:45)], randomForestTreeList)
 printStats("Random Forest", randomForestTreeListClassifications, as.numeric(testset[4] > 0))
+
+print(paste("-","P-values","-",sep="--------"))
+print("P value bagging vs regular")
+print(getPValue(as.numeric(dataset[4] > 0),classifications, bagTreeListClassifications));
+print("P value random vs regular")
+print(getPValue(as.numeric(dataset[4] > 0),classifications, randomForestTreeListClassifications));
+print("P value random vs bagging")
+print(getPValue(as.numeric(dataset[4] > 0),bagTreeListClassifications, randomForestTreeListClassifications));
